@@ -68,6 +68,33 @@ def mask_out_long_lines(xyz):
     print('ending line filtering')
     return np.logical_not(line_mask)
 
+def mask_out_long_smooth_lines(xyz):
+    line_mask = [False]*xyz.shape[0]
+    inds_in_a_line = []
+    # costheta_min_acceptable = np.cos(30*np.pi/180)
+    d_max_acceptable = .3
+    for point_ind in range(xyz.shape[0]):
+        if len(inds_in_a_line) <= 2:
+            inds_in_a_line.append(point_ind)
+            continue
+        point = xyz[point_ind,:]
+        ps = xyz[inds_in_a_line[-2],:]
+        pf = xyz[inds_in_a_line[-1],:]
+        pnew = xyz[point_ind,:]
+        d = norm(pnew - pf)
+        # costheta = np.dot(pnew - ps, pf - ps)/(norm(pnew-ps)*norm(pf-ps))
+        # if (d > d_max_acceptable) or (costheta < costheta_min_acceptable):
+        if (d > d_max_acceptable):
+            p0 = xyz[inds_in_a_line[0],:]
+            if len(inds_in_a_line) > 3 and norm(p0-pf) > 5:
+                for ind in inds_in_a_line:
+                    line_mask[ind] = True
+            inds_in_a_line = []
+            continue
+        inds_in_a_line.append(point_ind)
+    return np.logical_not(line_mask)
+
+
 def mask_largest_plane(xyz):
     """
     Returns a np.array of {True,False} with size of xyz.shape[0]
@@ -122,10 +149,12 @@ def mask_far_points(lidar):
 
 
 def lidar_mask(lidar):
-    
+    print("getting lidar mask")
     not_ground = mask_out_large_planes(lidar)
     near = mask_far_points(lidar)
-    return np.logical_and(not_ground, near)
+    not_long = mask_out_long_smooth_lines(lidar)
+    print("lidar mask finished")
+    return np.logical_and(not_ground, near, not_long)
 
 
 # def kmeans_cluster(masked_lidar):
@@ -173,11 +202,14 @@ def euclid_segmentation(point_cloud, dist, min_size):
         G.add_nodes_from(near)
         G.add_edges_from(to_edges(near))
 
-    clusters = [cc for cc in connected_components(G) if len(cc)>min_size]
-    return clusters
+    clusters_ind = [cc for cc in connected_components(G) if len(cc)>min_size]
+    return clusters_ind
 
 def car_clusters(point_cloud):
-    clusters_ind = euclid_segmentation(point_cloud, dist=.3, min_size=20)
+    dist = norm(point_cloud,axis=1)
+    # IPython.embed()
+    # scaled_point_cloud = point_cloud/np.array([np.sqrt(dist),np.sqrt(dist), np.ones(dist.shape)]).transpose()
+    clusters_ind = euclid_segmentation(point_cloud, dist=0.7, min_size=10)
     all_clusters = [point_cloud[list(inds),:] for inds in clusters_ind]
     # for cluster in all_clusters:
     #     upper = np.max(cluster, axis=0)
@@ -209,6 +241,19 @@ def extract_image(image, corners):
     ll, ur = corners
     lower, left = ll
     upper, right = ur
+
+    lower -= 15
+    left -= 15
+    upper += 15
+    right += 15
+    # IPython.embed()
+
+    lower = max(lower, 0)
+    left = max(left, 0)
+    upper = min(upper, image.shape[1]-1)
+    right = min(right, image.shape[0]-1)
+
+    
     # IPython.embed()
     return image[left:right, lower:upper, :]
     

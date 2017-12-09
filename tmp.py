@@ -6,6 +6,8 @@ import numpy as np
 import IPython
 import parse_lidar
 import csv
+import classify_image
+import imageio
 
 
 def rot(n, theta):
@@ -47,6 +49,9 @@ classes = ['Unknown', 'Compacts', 'Sedans', 'SUVs', 'Coupes',
 
 # files = glob('deploy/*/*/*_image.jpg')
 files = glob('../rob599_dataset_deploy/trainval/*/*_image.jpg')
+# files = glob('../rob599_dataset_deploy/trainval/e95739d4-4eeb-4087-b22f-851964073287/0010_image.jpg')
+# files = glob('../rob599_dataset_deploy/trainval/aaa5a89c-d03d-494d-b72e-afd02734e73b/0027_image.jpg')
+
 
 num_cars = {}
 with open('../rob599_dataset_deploy/trainval/num_cars.csv') as true_cars_file:
@@ -81,22 +86,26 @@ bbox.resize([bbox.size // 11, 11])
 uv = proj @ np.vstack([xyz.transpose(), np.ones_like(xyz[:,0])])
 uv = uv / uv[2, :]
 
+# classifier = classify.Classifier()
 
 # centers = parse_lidar.get_points_of_interest(xyz)
 imgs_of_interest = parse_lidar.get_potential_car_images(img, xyz, np.array(proj))
 clusters = parse_lidar.get_points_of_interest(xyz)
 inliers = parse_lidar.lidar_mask(xyz)
-line_mask = parse_lidar.mask_out_long_lines(xyz)
+line_mask = parse_lidar.mask_out_long_smooth_lines(xyz)
 # IPython.embed()
 # uv = uv[:, inliers]
 
 
-clr = np.linalg.norm(xyz, axis=0)
+
+
+clr = np.linalg.norm(xyz, axis=1)
 fig1 = plt.figure(1, figsize=(16, 9))
 ax1 = fig1.add_subplot(1, 1, 1)
 ax1.imshow(img)
-# ax1.scatter(uv[0, :], uv[1, :], c=clr[inliers], marker='.', s=1)
-ax1.scatter(uv[0, line_mask], uv[1, line_mask], marker='.', s=1)
+ax1.scatter(uv[0, inliers], uv[1, inliers], c=clr[inliers], marker='.', s=1)
+# ax1.scatter(uv[0, :], uv[1, :], marker='.', s=1)
+# ax1.scatter(uv[0, line_mask], uv[1, line_mask], marker='.', s=2)
 ax1.axis('scaled')
 fig1.tight_layout()
 
@@ -108,13 +117,22 @@ ax2.set_xlabel('x')
 ax2.set_ylabel('y')
 ax2.set_zlabel('z')
 
-
+classify_image.create_graph()
 
 fig3 = plt.figure(3, figsize=(10,10))
 num_fig = len(imgs_of_interest)
 for i in range(num_fig):
     ax = fig3.add_subplot(np.ceil(np.sqrt(num_fig)),np.ceil(np.sqrt(num_fig)),i+1)
     ax.imshow(imgs_of_interest[i])
+    # label = classifier.classify(imgs_of_interest[i])
+    imgpath = '/tmp/img.jpg'
+    imageio.imwrite(imgpath, imgs_of_interest[i])
+
+    # IPython.embed()
+    
+    label = classify_image.run_inference_on_image_path(imgpath)
+    # IPython.embed()
+    ax.set_title(label)
     ax.set_axis_off()
 
 
