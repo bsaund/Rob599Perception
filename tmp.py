@@ -65,6 +65,7 @@ img = plt.imread(snapshot)
 
 xyz = np.memmap(snapshot.replace('_image.jpg', '_cloud.bin'), dtype=np.float32)
 xyz.resize([3, xyz.size // 3])
+xyz = np.array(xyz).transpose()
 
 proj = np.memmap(snapshot.replace('_image.jpg', '_proj.bin'), dtype=np.float32)
 proj.resize([3, proj.size // 3])
@@ -77,24 +78,29 @@ except:
     bbox = np.array([], dtype=np.float32)
 bbox.resize([bbox.size // 11, 11])
 
-uv = proj @ np.vstack([xyz, np.ones_like(xyz[0, :])])
+uv = proj @ np.vstack([xyz.transpose(), np.ones_like(xyz[:,0])])
 uv = uv / uv[2, :]
 
 
 # centers = parse_lidar.get_points_of_interest(xyz)
 imgs_of_interest = parse_lidar.get_potential_car_images(img, xyz, np.array(proj))
+clusters = parse_lidar.get_points_of_interest(xyz)
 inliers = parse_lidar.lidar_mask(xyz)
+line_mask = parse_lidar.mask_out_long_lines(xyz)
 # IPython.embed()
-uv = uv[:, inliers]
+# uv = uv[:, inliers]
 
 
 clr = np.linalg.norm(xyz, axis=0)
 fig1 = plt.figure(1, figsize=(16, 9))
 ax1 = fig1.add_subplot(1, 1, 1)
 ax1.imshow(img)
-ax1.scatter(uv[0, :], uv[1, :], c=clr[inliers], marker='.', s=1)
+# ax1.scatter(uv[0, :], uv[1, :], c=clr[inliers], marker='.', s=1)
+ax1.scatter(uv[0, line_mask], uv[1, line_mask], marker='.', s=1)
 ax1.axis('scaled')
 fig1.tight_layout()
+
+
 
 fig2 = plt.figure(2, figsize=(8, 8))
 ax2 = Axes3D(fig2)
@@ -102,9 +108,12 @@ ax2.set_xlabel('x')
 ax2.set_ylabel('y')
 ax2.set_zlabel('z')
 
+
+
 fig3 = plt.figure(3, figsize=(10,10))
-for i in range(len(imgs_of_interest)):
-    ax = fig3.add_subplot(8,8,i+1)
+num_fig = len(imgs_of_interest)
+for i in range(num_fig):
+    ax = fig3.add_subplot(np.ceil(np.sqrt(num_fig)),np.ceil(np.sqrt(num_fig)),i+1)
     ax.imshow(imgs_of_interest[i])
     ax.set_axis_off()
 
@@ -115,7 +124,11 @@ for i in range(len(imgs_of_interest)):
 step = 5
 # ax2.scatter(xyz[0, ::step], xyz[1, ::step], xyz[2, ::step], \
 #     c=clr[::step], marker='.', s=1)
-ax2.scatter(xyz[0, inliers], xyz[1, inliers], xyz[2, inliers], marker='.', s=1)
+# ax2.scatter(xyz[0, inliers], xyz[1, inliers], xyz[2, inliers], marker='.', s=1)
+print(len(clusters), "clusters found")
+for cluster in clusters:
+    # IPython.embed()
+    ax2.scatter(cluster[:,0], cluster[:,1], cluster[:,2], marker='.', s=1)
 
 colors = ['C{:d}'.format(i) for i in range(10)]
 for k, b in enumerate(bbox):
