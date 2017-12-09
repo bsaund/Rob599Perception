@@ -43,27 +43,29 @@ def diag_len(cluster):
     return np.linalg.norm(np.max(cluster, axis=0) - np.min(cluster,axis=0))
 
 def mask_out_long_lines(xyz):
+    print('starting line filtering')
     line_mask = [False]*xyz.shape[0]
-    in_a_line = []
+    inds_in_a_line = []
     d_max_acceptable = 0.1
     for point_ind in range(xyz.shape[0]):
         point = xyz[point_ind,:]
-        if len(in_a_line) <= 2:
-            in_a_line.append(point_ind)
+        if len(inds_in_a_line) <= 2:
+            inds_in_a_line.append(point_ind)
             continue
         d_max = 0
-        p1 = in_a_line[0]
-        pe = in_a_line[-1]
-        IPython.embed()
-        for i in range(1, len(in_a_line)-1):
-            d_max = max(d_max, norm(np.cross(pe-p1, p1-xyz[in_a_line[i],:]))/norm(pe-p1))
+        p1 = xyz[inds_in_a_line[0],:]
+        pe = xyz[inds_in_a_line[-1],:]
+        print(len(inds_in_a_line))
+        for i in range(1, len(inds_in_a_line)-1):
+            d_max = max(d_max, norm(np.cross(pe-p1, p1-xyz[inds_in_a_line[i],:]))/norm(pe-p1))
         if d_max > d_max_acceptable:
-            if len(in_a_line) > 2 and norm(pe-p1) > 5:
-                line_mask[in_a_line] = True
-            in_a_line = []
+            if len(inds_in_a_line) > 2 and norm(pe-p1) > 5:
+                for ind in inds_in_a_line:
+                    line_mask[ind] = True
+            inds_in_a_line = []
             continue
-        in_a_line.append(point_ind)
-
+        inds_in_a_line.append(point_ind)
+    print('ending line filtering')
     return np.logical_not(line_mask)
 
 def mask_largest_plane(xyz):
