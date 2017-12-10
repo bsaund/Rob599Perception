@@ -166,15 +166,18 @@ def run_inference_on_image(image_data):
 
     
     # top_k = predictions.argsort()[-FLAGS.num_top_predictions:][::-1]
-    # top_k = predictions.argsort()[-5:][::-1]
-    # for node_id in top_k:
-    #   human_string = node_lookup.id_to_string(node_id)
-    #   score = predictions[node_id]
-    #   print('%s (score = %.5f)' % (human_string, score))
-    best_node=predictions.argsort()[-1]
-    human_string = node_lookup.id_to_string(best_node)
-    score = predictions[best_node]
-    return '%s (score = %.5f)' % (human_string, score)
+    top_k = predictions.argsort()[-2:][::-1]
+    outstr = ''
+    for node_id in top_k:
+      human_string = node_lookup.id_to_string(node_id)
+      score = predictions[node_id]
+      # print('%s (score = %.5f)' % (human_string, score))
+      outstr += '%s (%.2f)\n' % (human_string, score)
+    return outstr
+    # best_node=predictions.argsort()[-1]
+    # human_string = node_lookup.id_to_string(best_node)
+    # score = predictions[best_node]
+    # return '%s (%.5f)' % (human_string, score)
     
     
 

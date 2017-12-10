@@ -149,11 +149,11 @@ def mask_far_points(lidar):
 
 
 def lidar_mask(lidar):
-    print("getting lidar mask")
+    # print("getting lidar mask")
     not_ground = mask_out_large_planes(lidar)
     near = mask_far_points(lidar)
     not_long = mask_out_long_smooth_lines(lidar)
-    print("lidar mask finished")
+    # print("lidar mask finished")
     return np.logical_and(not_ground, near, not_long)
 
 
@@ -261,6 +261,21 @@ def extract_image(image, corners):
 def extract_images(image, corners_list):
     images = []
     for corners in corners_list:
+        ll, ur = corners
+        dims = ur-ll
+        if dims[1] == 0:
+            continue
+        if dims[0] == 0:
+            continue
+        
+        if dims[1]/dims[0] > 1.5:
+            #Too tall
+            continue
+        
+        if dims[0]/dims[1] > 5:
+            #Too wide
+            continue
+        
         images.append(extract_image(image,corners))
         # IPython.embed()
     return images

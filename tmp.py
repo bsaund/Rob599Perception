@@ -10,6 +10,9 @@ import classify_image
 import imageio
 
 
+CAR_WORDS = ['minivan', 'sports car', 'car,', 'cab', 'taxi', 'convertible', 'limo',
+             'jeep', 'landrover', 'R.V.']
+
 def rot(n, theta):
     n = n / np.linalg.norm(n, 2)
     K = np.array([[0, -n[2], n[1]], [n[2], 0, -n[0]], [-n[1], n[0], 0]])
@@ -48,7 +51,8 @@ classes = ['Unknown', 'Compacts', 'Sedans', 'SUVs', 'Coupes',
            'Military', 'Commercial', 'Trains']
 
 # files = glob('deploy/*/*/*_image.jpg')
-files = glob('../rob599_dataset_deploy/trainval/*/*_image.jpg')
+# files = glob('../rob599_dataset_deploy/trainval/*/*_image.jpg')
+files = glob('../rob599_dataset_deploy/test/0815cc1e-9a0c-4875-a5ca-784ef1a32bba/0008_image.jpg')
 # files = glob('../rob599_dataset_deploy/trainval/e95739d4-4eeb-4087-b22f-851964073287/0010_image.jpg')
 # files = glob('../rob599_dataset_deploy/trainval/aaa5a89c-d03d-494d-b72e-afd02734e73b/0027_image.jpg')
 
@@ -119,6 +123,9 @@ ax2.set_zlabel('z')
 
 classify_image.create_graph()
 
+car_count = 0
+
+
 fig3 = plt.figure(3, figsize=(10,10))
 num_fig = len(imgs_of_interest)
 for i in range(num_fig):
@@ -131,6 +138,13 @@ for i in range(num_fig):
     # IPython.embed()
     
     label = classify_image.run_inference_on_image_path(imgpath)
+    found = False
+    for word in CAR_WORDS:
+        if label.find(word) >= 0:
+            found = True
+            label = word.capitalize()
+            car_count += 1
+            break
     # IPython.embed()
     ax.set_title(label)
     ax.set_axis_off()
@@ -184,7 +198,14 @@ for e in np.identity(3):
 
 id = snapshot[0:-10]
 id = id[34:]
-print(num_cars[id])
+
+try:
+    print('ground truth: ', num_cars[id])
+except:
+    pass
+
+    
+print('we count:     ', car_count)
 plt.show()
 
 
