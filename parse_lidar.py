@@ -285,9 +285,15 @@ def extract_images(image, corners_list):
 
     Parameters
     corners_list [([int, int], [int, int])]: list of lower left and upper right corners
+
+    Returns
+    images - list of images
+    mask   - mask indicating which corners were accepted as potential cars
     """
+    mask = [False]*len(corners_list)
     images = []
-    for corners in corners_list:
+    for i in range(len(corners_list)):
+        corners = corners_list[i]
         ll, ur = corners
         dims = ur-ll
         if dims[1] == 0:
@@ -304,11 +310,17 @@ def extract_images(image, corners_list):
             continue
         
         images.append(extract_image(image,corners))
+        mask[i] = True
         # IPython.embed()
-    return images
+    assert(len(images) == np.sum(mask))
+    return (images, mask)
 
 
 def get_potential_car_images(image, raw_lidar, proj):
+    imgs, pois = get_imgs_and_clusters(image, raw_lidar, proj)
+    return imgs
+
+def get_imgs_and_clusters(image, raw_lidar, proj):
     """
     Wraps all the other functions here...
     Given an image, lidar data, and a projection matrix, returns a list of images of 
@@ -325,7 +337,9 @@ def get_potential_car_images(image, raw_lidar, proj):
         ll = (np.min(camerah[:,0:2],axis=0)).astype(int)
         ur = (np.max(camerah[:,0:2],axis=0)).astype(int)
         corners.append((ll,ur))
-    return extract_images(image, corners)
+    imgs, mask = extract_images(image, corners)
+    return imgs, np.array(pois)[mask]
+    
     
     
 
