@@ -13,6 +13,9 @@ from networkx.algorithms.components.connected import connected_components
 import IPython
 
 class PlaneModel:
+    """
+    Base model for a plane used in RANSAC 
+    """
     def __init__(self, P=None):
         self.P = P
         
@@ -40,9 +43,18 @@ class PlaneModel:
             self.P = P
 
 def diag_len(cluster):
+    """
+    Returns the diagonal length of the axis-aligned bounding box of a cluster of points
+    """
     return np.linalg.norm(np.max(cluster, axis=0) - np.min(cluster,axis=0))
 
 def mask_out_long_lines(xyz):
+    """
+    Returns a mask that removes long straight lines from the lidar data
+    xyz[mask] = lidar points that are not road, building, etc...
+
+    NOT USED: THIS APPROACH WAS TOO EXPENSIVE
+    """
     print('starting line filtering')
     line_mask = [False]*xyz.shape[0]
     inds_in_a_line = []
@@ -69,9 +81,18 @@ def mask_out_long_lines(xyz):
     return np.logical_not(line_mask)
 
 def mask_out_long_smooth_lines(xyz):
+    """
+    Returns a mask that removes long sequences of lidar data that (locally) dont change much
+    xyz[mask] = lidar points that are not road, building, etc...
+
+    This iterates through all lidar data, finding the large 'jumps' is position.
+    If a sufficiently long section has no jumps, then it cannot be a car.
+    """
+    
     line_mask = [False]*xyz.shape[0]
     inds_in_a_line = []
     # costheta_min_acceptable = np.cos(30*np.pi/180)
+    
     d_max_acceptable = .3
     for point_ind in range(xyz.shape[0]):
         if len(inds_in_a_line) <= 2:
@@ -82,6 +103,7 @@ def mask_out_long_smooth_lines(xyz):
         pf = xyz[inds_in_a_line[-1],:]
         pnew = xyz[point_ind,:]
         d = norm(pnew - pf)
+        
         # costheta = np.dot(pnew - ps, pf - ps)/(norm(pnew-ps)*norm(pf-ps))
         # if (d > d_max_acceptable) or (costheta < costheta_min_acceptable):
         if (d > d_max_acceptable):
@@ -99,6 +121,8 @@ def mask_largest_plane(xyz):
     """
     Returns a np.array of {True,False} with size of xyz.shape[0]
     This is a mask, where True are points near the largest plane
+
+    The largest plane is probably the road, so remove those lidar points
     """
     ransac = linear_model.RANSACRegressor(PlaneModel(),
                                           max_trials=100,
@@ -114,6 +138,10 @@ def mask_out_large_planes_complicated(xyz):
     """
     Returns a np.array of {True,False} with size of lidar.shape[0]
     This is a mask for all sufficiently large planes in the image
+    
+    Keeps removing largest plane until no large planes exist
+    TOO EXPENSIVE< NOT USEFUL ENOUGH
+    NOT USED
     """
     not_plane = np.array([True] * xyz.shape[0])
     
@@ -141,40 +169,22 @@ def mask_out_large_planes_complicated(xyz):
     # return np.logical_not(mask_largest_plane(xyz))
 
 def mask_out_large_planes(xyz):
-    """ Masks only the largest plane)"""
+    """ Masks only the largest plane"""
     return np.logical_not(mask_largest_plane(xyz))
 
 def mask_far_points(lidar):
+    """Mask out points above the threshold"""
     return np.linalg.norm(lidar, axis=1) < 60
 
 
 def lidar_mask(lidar):
+    """Returns a mask the removes all uninteresting lidar points"""
     # print("getting lidar mask")
     not_ground = mask_out_large_planes(lidar)
     near = mask_far_points(lidar)
     not_long = mask_out_long_smooth_lines(lidar)
     # print("lidar mask finished")
     return np.logical_and(not_ground, near, not_long)
-
-
-# def kmeans_cluster(masked_lidar):
-#     kmeans = KMeans(n_clusters=50)
-#     kmeans.fit(masked_lidar)
-#     labels = kmeans.labels_
-#     return kmeans.cluster_centers_
-#     # IPython.embed()
-
-# def get_points_around_cluster(centers, inliers):
-#     # IPython.embed()
-#     clusters = []
-#     for center in centers:
-#         # IPython.embed()
-#         cm = np.linalg.norm(inliers-center,axis=1) < 4.0
-#         clusters.append(inliers[cm])
-
-#     return clusters
-
-# def get_cluster_centers(raw_lidar):
 
 
 def to_edges(nodes):
@@ -206,6 +216,10 @@ def euclid_segmentation(point_cloud, dist, min_size):
     return clusters_ind
 
 def car_clusters(point_cloud):
+    """
+    Segment interesting point cloud points into regions.
+    Remove regions that are too big or small to be cars
+    """
     dist = norm(point_cloud,axis=1)
     # IPython.embed()
     # scaled_point_cloud = point_cloud/np.array([np.sqrt(dist),np.sqrt(dist), np.ones(dist.shape)]).transpose()
@@ -214,8 +228,6 @@ def car_clusters(point_cloud):
     # for cluster in all_clusters:
     #     upper = np.max(cluster, axis=0)
     #     lower = np.min(cluster, axis=0)
-        
-    #     IPython.embed()
     
     right_sized_clusters = [c for c in all_clusters if
                             diag_len(c) < 6 and diag_len(c) > 0.5]
@@ -223,6 +235,9 @@ def car_clusters(point_cloud):
                             
 
 def get_points_of_interest(raw_lidar):
+    """
+    Parses the lidar data into clusters of points that could potentially be cars
+    """
     inlier_mask = lidar_mask(raw_lidar)
     inliers = raw_lidar[inlier_mask,:]
     # centers = kmeans_cluster(inliers)
@@ -238,6 +253,10 @@ def get_points_of_interest(raw_lidar):
 
 
 def extract_image(image, corners):
+    """
+    Given an image and bounding corners, return a sub-image
+    Adds some padding to the corners
+    """
     ll, ur = corners
     lower, left = ll
     upper, right = ur
@@ -259,6 +278,14 @@ def extract_image(image, corners):
     
 
 def extract_images(image, corners_list):
+    """
+    Given an image and a list of corner points, return the subimages
+
+    Does some filters to remove images that have too severe an aspect ratio to be a car
+
+    Parameters
+    corners_list [([int, int], [int, int])]: list of lower left and upper right corners
+    """
     images = []
     for corners in corners_list:
         ll, ur = corners
@@ -282,6 +309,12 @@ def extract_images(image, corners_list):
 
 
 def get_potential_car_images(image, raw_lidar, proj):
+    """
+    Wraps all the other functions here...
+    Given an image, lidar data, and a projection matrix, returns a list of images of 
+      where the lidar is interesting. Some will be cars, some will not be cars.
+    It is intended that all cars are somewhere in the images returned
+    """
     pois = get_points_of_interest(raw_lidar)
     corners = []
     for poi in pois:
