@@ -13,13 +13,16 @@ import time
 
 
 CAR_WORDS = ['minivan', 'sports car', 'car,', 'cab', 'taxi', 'convertible', 'limo',
-             'jeep', 'landrover', 'R.V.']
+             'jeep', 'landrover', 'R.V.', 'go-kart', 'dustcart', 'pickup',
+             'snowplow', 'cassette player', 'Model T', 'ricksha', 'rickshaw']
+             # 'moving van', #This one is iffy. sometimes random stuff is moving vans
 
-classes = ['Unknown', 'Compacts', 'Sedans', 'SUVs', 'Coupes',
-           'Muscle', 'SportsClassics', 'Sports', 'Super', 'Motorcycles',
-           'OffRoad', 'Industrial', 'Utility', 'Vans', 'Cycles',
-           'Boats', 'Helicopters', 'Planes', 'Service', 'Emergency',
-           'Military', 'Commercial', 'Trains']
+
+# classes = ['Unknown', 'Compacts', 'Sedans', 'SUVs', 'Coupes',
+#            'Muscle', 'SportsClassics', 'Sports', 'Super', 'Motorcycles',
+#            'OffRoad', 'Industrial', 'Utility', 'Vans', 'Cycles',
+#            'Boats', 'Helicopters', 'Planes', 'Service', 'Emergency',
+#            'Military', 'Commercial', 'Trains']
 
 
 files = glob('../rob599_dataset_deploy/test/*/*_image.jpg')
@@ -79,7 +82,6 @@ for i in range(len(files)):
         ax = fig3.add_subplot(np.ceil(np.sqrt(num_fig)),np.ceil(np.sqrt(num_fig)),i+1)
         ax.imshow(imgs_of_interest[i])
         # label = classifier.classify(imgs_of_interest[i])
-        # IPython.embed()
         
         for word in CAR_WORDS:
             if label.find(word) >= 0:
@@ -92,7 +94,6 @@ for i in range(len(files)):
     plt.show()
     plt.pause(0.1)
 
-    IPython.embed()
 
     with open('./outfile.txt','a') as f:
         f.write(imgpath[30:-10] + ',' + str(car_count) + '\n')
