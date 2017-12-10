@@ -8,40 +8,14 @@ import parse_lidar
 import csv
 import classify_image
 import imageio
+import utils
 
 
 CAR_WORDS = ['minivan', 'sports car', 'car,', 'cab', 'taxi', 'convertible', 'limo',
              'jeep', 'landrover', 'R.V.']
 
-def rot(n, theta):
-    n = n / np.linalg.norm(n, 2)
-    K = np.array([[0, -n[2], n[1]], [n[2], 0, -n[0]], [-n[1], n[0], 0]])
-    return np.identity(3) + np.sin(theta) * K + (1 - np.cos(theta)) * K @ K
 
 
-def get_bbox(p0, p1):
-    '''
-    Input:
-    *   p0, p1
-        (3)
-        Corners of a bounding box represented in the body frame.
-
-    Output:
-    *   v
-        (3, 8)
-        Vertices of the bounding box represented in the body frame.
-    *   e
-        (2, 14)
-        Edges of the bounding box. The first 2 edges indicate the `front` side
-        of the box.
-    '''
-    v = np.array([[p0[0], p0[0], p0[0], p0[0], p1[0], p1[0], p1[0], p1[0]],
-                  [p0[1], p0[1], p1[1], p1[1], p0[1], p0[1], p1[1], p1[1]],
-                  [p0[2], p1[2], p0[2], p1[2], p0[2], p1[2], p0[2], p1[2]]])
-    e = np.array([[2, 3, 0, 0, 3, 3, 0, 1, 2, 3, 4, 4, 7, 7],
-                  [7, 6, 1, 2, 1, 2, 4, 5, 6, 7, 5, 6, 5, 6]], dtype=np.uint8)
-
-    return v, e
 
 
 classes = ['Unknown', 'Compacts', 'Sedans', 'SUVs', 'Coupes',
@@ -52,8 +26,8 @@ classes = ['Unknown', 'Compacts', 'Sedans', 'SUVs', 'Coupes',
 
 # files = glob('deploy/*/*/*_image.jpg')
 # files = glob('../rob599_dataset_deploy/trainval/*/*_image.jpg')
-files = glob('../rob599_dataset_deploy/test/0815cc1e-9a0c-4875-a5ca-784ef1a32bba/0008_image.jpg')
-# files = glob('../rob599_dataset_deploy/trainval/e95739d4-4eeb-4087-b22f-851964073287/0010_image.jpg')
+# files = glob('../rob599_dataset_deploy/test/0815cc1e-9a0c-4875-a5ca-784ef1a32bba/0008_image.jpg')
+files = glob('../rob599_dataset_deploy/trainval/e95739d4-4eeb-4087-b22f-851964073287/0010_image.jpg')
 # files = glob('../rob599_dataset_deploy/trainval/aaa5a89c-d03d-494d-b72e-afd02734e73b/0027_image.jpg')
 
 
@@ -72,20 +46,9 @@ print(snapshot)
 
 img = plt.imread(snapshot)
 
-xyz = np.memmap(snapshot.replace('_image.jpg', '_cloud.bin'), dtype=np.float32)
-xyz.resize([3, xyz.size // 3])
-xyz = np.array(xyz).transpose()
-
-proj = np.memmap(snapshot.replace('_image.jpg', '_proj.bin'), dtype=np.float32)
-proj.resize([3, proj.size // 3])
-
-
-try:
-    bbox = np.memmap(snapshot.replace('_image.jpg', '_bbox.bin'), dtype=np.float32)
-except:
-    print('[*] bbox not found.')
-    bbox = np.array([], dtype=np.float32)
-bbox.resize([bbox.size // 11, 11])
+xyz = utils.get_lidar(snapshot)
+proj = utils.get_camera_projection(snapshot)
+bboxes = utils.get_bboxes(snapshot)
 
 uv = proj @ np.vstack([xyz.transpose(), np.ones_like(xyz[:,0])])
 uv = uv / uv[2, :]
@@ -163,17 +126,18 @@ for cluster in clusters:
     ax2.scatter(cluster[:,0], cluster[:,1], cluster[:,2], marker='.', s=1)
 
 colors = ['C{:d}'.format(i) for i in range(10)]
-for k, b in enumerate(bbox):
-    n = b[0:3]
-    theta = np.linalg.norm(n)
-    n /= theta
-    R = rot(n, theta)
-    t = b[3:6]
+for k, b in enumerate(bboxes):
+    # n = b[0:3]
+    # theta = np.linalg.norm(n)
+    # n /= theta
+    # R = rot(n, theta)
+    # t = b[3:6]
 
-    # size of the bbox
-    sz = b[6:9]
-    vert_3D, edges = get_bbox(-sz / 2, sz / 2)
-    vert_3D = R @ vert_3D + t[:, np.newaxis]
+    # # size of the bboxes
+    # sz = b[6:9]
+    # vert_3D, edges = utils.get_bboxes(-sz / 2, sz / 2)
+    # vert_3D = R @ vert_3D + t[:, np.newaxis]
+    vert_3D, edges, t = utils.unpack_bbox(b)
 
     vert_2D = proj @ np.vstack([vert_3D, np.ones(8)])
     vert_2D = vert_2D / vert_2D[2, :]

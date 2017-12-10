@@ -10,6 +10,7 @@ import classify_image
 import imageio
 import random
 import time
+import utils
 
 
 CAR_WORDS = ['minivan', 'sports car', 'car,', 'cab', 'taxi', 'convertible', 'limo',
@@ -50,15 +51,8 @@ for i in range(len(files)):
     ax1.imshow(img)
     
 
-
-    xyz = np.memmap(imgpath.replace('_image.jpg', '_cloud.bin'), dtype=np.float32)
-    xyz.resize([3, xyz.size // 3])
-    xyz = np.array(xyz).transpose()
-
-    proj = np.memmap(imgpath.replace('_image.jpg', '_proj.bin'), dtype=np.float32)
-    proj.resize([3, proj.size // 3])
-
-
+    xyz = utils.get_lidar(imgpath)
+    proj = utils.get_camera_projection(imgpath)
 
     imgs_of_interest = parse_lidar.get_potential_car_images(img, xyz, np.array(proj))
     # clusters = parse_lidar.get_points_of_interest(xyz)
@@ -79,7 +73,7 @@ for i in range(len(files)):
                 break
 
 
-        ax = fig3.add_subplot(np.ceil(np.sqrt(num_fig)),np.ceil(np.sqrt(num_fig)),i+1)
+        ax = fig3.add_subplot(np.ceil(np.sqrt(num_fig)), np.ceil(np.sqrt(num_fig)), i+1)
         ax.imshow(imgs_of_interest[i])
         # label = classifier.classify(imgs_of_interest[i])
         
