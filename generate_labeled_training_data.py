@@ -91,7 +91,7 @@ fig2 = plt.figure(2, figsize=(8, 8))
 fig3 = plt.figure(3, figsize=(10,10))
 
 with open(LABELS_FILE, 'w') as f:
-    f.write('filepath, label')
+    f.write('filepath, label\n')
 
 
 plt.ion()
