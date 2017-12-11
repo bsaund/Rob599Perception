@@ -12,6 +12,24 @@ from networkx.algorithms.components.connected import connected_components
 
 import IPython
 
+
+def densify_lidar(xyz, densify_dist=30):
+    """
+    Returns new lidar points, with additional points filling in far away gaps
+    """
+    new_xyz = []
+    for i in range(xyz.shape[0]-1):
+        p0 = xyz[i,:]
+        p1 = xyz[i+1,:]
+        r = np.linalg.norm(p0)
+        num_to_add = int(np.ceil(r/densify_dist))
+        for i in range(num_to_add):
+            a = i/num_to_add
+            pn = p0*np.array([1-a,1-a,1]) + p1*np.array([a,a,0])
+            new_xyz.append(pn)
+    return np.array(new_xyz)
+
+
 class PlaneModel:
     """
     Base model for a plane used in RANSAC 
@@ -91,7 +109,7 @@ def mask_out_long_smooth_lines(xyz):
     
     line_mask = [False]*xyz.shape[0]
     inds_in_a_line = []
-    # costheta_min_acceptable = np.cos(30*np.pi/180)
+    costheta_min_acceptable = np.cos(10*np.pi/180)
     
     d_max_acceptable = .3
     for point_ind in range(xyz.shape[0]):
@@ -104,11 +122,11 @@ def mask_out_long_smooth_lines(xyz):
         pnew = xyz[point_ind,:]
         d = norm(pnew - pf)
         
-        # costheta = np.dot(pnew - ps, pf - ps)/(norm(pnew-ps)*norm(pf-ps))
+        costheta = np.dot(pnew - ps, pf - ps)/(norm(pnew-ps)*norm(pf-ps))
         # if (d > d_max_acceptable) or (costheta < costheta_min_acceptable):
         if (d > d_max_acceptable):
             p0 = xyz[inds_in_a_line[0],:]
-            if len(inds_in_a_line) > 3 and norm(p0-pf) > 5:
+            if len(inds_in_a_line) > 3 and norm(p0-pf) > 7:
                 for ind in inds_in_a_line:
                     line_mask[ind] = True
             inds_in_a_line = []
@@ -176,15 +194,35 @@ def mask_far_points(lidar):
     """Mask out points above the threshold"""
     return np.linalg.norm(lidar, axis=1) < 60
 
+def mask_out_horizontal(xyz):
+    kdtree = KDTree(xyz)
+    too_horizontal = [False]*xyz.shape[0]
+    radius = 0.4
+    slope_tol = .2
+    vert_tol = slope_tol*radius
+    for i in range(xyz.shape[0]):
+        p = xyz[i,:]
+        y = p[1]
+        neighbors = kdtree.query_radius([p], r=radius)[0]
+        if len(neighbors) == 0:
+            continue
+            
+        y_neighbors = xyz[neighbors, 1]
+        if np.max(np.abs(y-y_neighbors)) < vert_tol:
+            too_horizontal[i] = True
+    return np.logical_not(too_horizontal)
+
 
 def lidar_mask(lidar):
     """Returns a mask the removes all uninteresting lidar points"""
-    # print("getting lidar mask")
-    not_ground = mask_out_large_planes(lidar)
+
+    # not_ground = mask_out_large_planes(lidar)
     near = mask_far_points(lidar)
     not_long = mask_out_long_smooth_lines(lidar)
-    # print("lidar mask finished")
-    return np.logical_and(not_ground, near, not_long)
+    not_hor = mask_out_horizontal(lidar)
+
+    # return np.logical_and(not_ground, near, not_long)
+    return np.logical_and(near, not_hor)
 
 
 def to_edges(nodes):
@@ -220,17 +258,14 @@ def car_clusters(point_cloud):
     Segment interesting point cloud points into regions.
     Remove regions that are too big or small to be cars
     """
-    dist = norm(point_cloud,axis=1)
-    # IPython.embed()
-    # scaled_point_cloud = point_cloud/np.array([np.sqrt(dist),np.sqrt(dist), np.ones(dist.shape)]).transpose()
-    clusters_ind = euclid_segmentation(point_cloud, dist=0.7, min_size=10)
+    #Since most occlusions can be in z, care about z less when segmenting
+    scaling = np.repeat([[1,1,.5]], point_cloud.shape[0], axis=0)
+    clusters_ind = euclid_segmentation(point_cloud*scaling, dist=0.7, min_size=10)
+    # clusters_ind = euclid_segmentation(point_cloud, dist=0.7, min_size=10)
     all_clusters = [point_cloud[list(inds),:] for inds in clusters_ind]
-    # for cluster in all_clusters:
-    #     upper = np.max(cluster, axis=0)
-    #     lower = np.min(cluster, axis=0)
     
     right_sized_clusters = [c for c in all_clusters if
-                            diag_len(c) < 6 and diag_len(c) > 0.5]
+                            diag_len(c) < 10 and diag_len(c) > 0.5]
     return right_sized_clusters
                             
 
