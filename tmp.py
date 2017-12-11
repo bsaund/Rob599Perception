@@ -27,7 +27,8 @@ classes = ['Unknown', 'Compacts', 'Sedans', 'SUVs', 'Coupes',
 # files = glob('deploy/*/*/*_image.jpg')
 # files = glob('../rob599_dataset_deploy/trainval/*/*_image.jpg')
 # files = glob('../rob599_dataset_deploy/test/0815cc1e-9a0c-4875-a5ca-784ef1a32bba/0008_image.jpg')
-files = glob('../rob599_dataset_deploy/trainval/e95739d4-4eeb-4087-b22f-851964073287/0010_image.jpg')
+# files = glob('../rob599_dataset_deploy/trainval/e95739d4-4eeb-4087-b22f-851964073287/0010_image.jpg')
+files = glob('../rob599_dataset_deploy/trainval/e95739d4-4eeb-4087-b22f-851964073287/0025_image.jpg')
 # files = glob('../rob599_dataset_deploy/trainval/aaa5a89c-d03d-494d-b72e-afd02734e73b/0027_image.jpg')
 
 
@@ -50,8 +51,6 @@ xyz = utils.get_lidar(snapshot)
 proj = utils.get_camera_projection(snapshot)
 bboxes = utils.get_bboxes(snapshot)
 
-uv = proj @ np.vstack([xyz.transpose(), np.ones_like(xyz[:,0])])
-uv = uv / uv[2, :]
 
 # classifier = classify.Classifier()
 
@@ -66,11 +65,12 @@ line_mask = parse_lidar.mask_out_long_smooth_lines(xyz)
 
 
 
-clr = np.linalg.norm(xyz, axis=1)
+
 fig1 = plt.figure(1, figsize=(16, 9))
 ax1 = fig1.add_subplot(1, 1, 1)
 ax1.imshow(img)
-ax1.scatter(uv[0, inliers], uv[1, inliers], c=clr[inliers], marker='.', s=1)
+utils.plot_img_lidar(ax1, xyz[inliers, :], proj)
+
 # ax1.scatter(uv[0, :], uv[1, :], marker='.', s=1)
 # ax1.scatter(uv[0, line_mask], uv[1, line_mask], marker='.', s=2)
 ax1.axis('scaled')
@@ -125,40 +125,8 @@ for cluster in clusters:
     # IPython.embed()
     ax2.scatter(cluster[:,0], cluster[:,1], cluster[:,2], marker='.', s=1)
 
-colors = ['C{:d}'.format(i) for i in range(10)]
-for k, b in enumerate(bboxes):
-    # n = b[0:3]
-    # theta = np.linalg.norm(n)
-    # n /= theta
-    # R = rot(n, theta)
-    # t = b[3:6]
-
-    # # size of the bboxes
-    # sz = b[6:9]
-    # vert_3D, edges = utils.get_bboxes(-sz / 2, sz / 2)
-    # vert_3D = R @ vert_3D + t[:, np.newaxis]
-    vert_3D, edges, t = utils.unpack_bbox(b)
-
-    vert_2D = proj @ np.vstack([vert_3D, np.ones(8)])
-    vert_2D = vert_2D / vert_2D[2, :]
-
-    clr = colors[k % len(colors)]
-    for e in edges.T:
-        ax1.plot(vert_2D[0, e], vert_2D[1, e], color=clr)
-        ax2.plot(vert_3D[0, e], vert_3D[1, e], vert_3D[2, e], color=clr)
-
-    c = classes[int(b[9])]
-    ignore_in_eval = bool(b[10])
-    if ignore_in_eval:
-        ax2.text(t[0], t[1], t[2], c, color='r')
-    else:
-        ax2.text(t[0], t[1], t[2], c)
-
-ax2.auto_scale_xyz([-40, 40], [-40, 40], [0, 80])
-ax2.view_init(elev=-30, azim=-90)
-
-for e in np.identity(3):
-    ax2.plot([0, e[0]], [0, e[1]], [0, e[2]], color=e)
+utils.plot_img_bboxes(ax1, bboxes, proj)
+utils.plot_3d_bboxes(ax2, bboxes)
 
 id = snapshot[0:-10]
 id = id[34:]

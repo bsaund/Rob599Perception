@@ -21,14 +21,14 @@ def get_bboxes(imagepath):
     
     try:
         #Convert to array as soon as possible. Otherwise potential data corruption
-        bboxes = np.array(np.memmap(imagepath.replace('_image.jpg', '_bbox.bin'),
-                                    dtype=np.float32))
+        bboxes = np.memmap(imagepath.replace('_image.jpg', '_bbox.bin'),
+                                    dtype=np.float32)
 
     except:
         print('[*] bbox not found.')
         bboxes = np.array([], dtype=np.float32)
     bboxes.resize([bboxes.size // 11, 11])
-    return bboxes
+    return np.copy(np.array(bboxes))
     
 
 
@@ -39,7 +39,8 @@ def rot(n, theta):
 
 
 
-def unpack_bbox(bbox):
+def unpack_bbox(bbox, expansion=0.0):
+    bbox = np.copy(bbox)
     n = bbox[0:3]
     theta = np.linalg.norm(n)
     n /= theta
@@ -47,10 +48,11 @@ def unpack_bbox(bbox):
     t = bbox[3:6]
 
     # size of the bbox
-    sz = bbox[6:9]
+    sz = bbox[6:9] + expansion
     vert_3D, edges = get_bbox(-sz / 2, sz / 2)
     vert_3D = R @ vert_3D + t[:, np.newaxis]
     return vert_3D, edges, t
+
 
 
 def get_bbox(p0, p1):
@@ -77,4 +79,61 @@ def get_bbox(p0, p1):
 
     return v, e
 
-# def in_bbox
+def plot_img_bboxes(ax, bboxes, proj):
+    colors = ['C{:d}'.format(i) for i in range(10)]
+    for k, b in enumerate(bboxes):
+        vert_3D, edges, t = unpack_bbox(b)
+        
+        vert_2D = proj @ np.vstack([vert_3D, np.ones(8)])
+        vert_2D = vert_2D / vert_2D[2, :]
+        
+        clr = colors[k % len(colors)]
+        ignore_in_eval = bool(b[10])
+        if ignore_in_eval:
+            continue
+        for e in edges.T:
+            ax.plot(vert_2D[0, e], vert_2D[1, e], color=clr)
+
+def plot_img_lidar(ax, xyz, proj):
+
+    uv = proj @ np.vstack([xyz.transpose(), np.ones_like(xyz[:,0])])
+    uv = uv / uv[2, :]
+    clr = np.linalg.norm(xyz, axis=1)
+    ax.scatter(uv[0, :], uv[1, :], c=clr, marker='.', s=1)
+
+def plot_img_pois(ax, pois, proj):
+    for points in pois:
+        plot_img_lidar(ax, points, proj)
+
+def plot_3d_bboxes(ax, bboxes):
+    classes = ['Unknown', 'Compacts', 'Sedans', 'SUVs', 'Coupes',
+           'Muscle', 'SportsClassics', 'Sports', 'Super', 'Motorcycles',
+           'OffRoad', 'Industrial', 'Utility', 'Vans', 'Cycles',
+           'Boats', 'Helicopters', 'Planes', 'Service', 'Emergency',
+           'Military', 'Commercial', 'Trains']
+
+    colors = ['C{:d}'.format(i) for i in range(10)]
+    for k, b in enumerate(bboxes):
+        vert_3D, edges, t = unpack_bbox(b)
+        
+        
+        clr = colors[k % len(colors)]
+        for e in edges.T:
+            ax.plot(vert_3D[0, e], vert_3D[1, e], vert_3D[2, e], color=clr)
+        # IPython.embed()
+        # ax.scatter(vert_3D[0,:], vert_3D[1,:], vert_3D[2,:])
+
+        c = classes[int(b[9])]
+        ignore_in_eval = bool(b[10])
+        if ignore_in_eval:
+            ax.text(t[0], t[1], t[2], c, color='w')
+        else:
+            ax.text(t[0], t[1], t[2], c)
+
+        ax.auto_scale_xyz([-40, 40], [-40, 40], [0, 80])
+        ax.view_init(elev=-30, azim=-90)
+
+    for e in np.identity(3):
+        ax.plot([0, e[0]], [0, e[1]], [0, e[2]], color=e)
+
+
