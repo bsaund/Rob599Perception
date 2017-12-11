@@ -6,29 +6,23 @@ import numpy as np
 import IPython
 import parse_lidar
 import csv
-import classify_image
+import label_image
 import imageio
 import random
 import time
 import utils
 
 
-CAR_WORDS = ['minivan', 'sports car', 'car,', 'cab', 'taxi', 'convertible', 'limo',
-             'jeep', 'landrover', 'R.V.', 'go-kart', 'dustcart', 'pickup',
-             'snowplow', 'cassette player', 'Model T', 'ricksha', 'rickshaw']
-             # 'moving van', #This one is iffy. sometimes random stuff is moving vans
+CAR_WORDS = ['car']
 
-
-# classes = ['Unknown', 'Compacts', 'Sedans', 'SUVs', 'Coupes',
-#            'Muscle', 'SportsClassics', 'Sports', 'Super', 'Motorcycles',
-#            'OffRoad', 'Industrial', 'Utility', 'Vans', 'Cycles',
-#            'Boats', 'Helicopters', 'Planes', 'Service', 'Emergency',
-#            'Military', 'Commercial', 'Trains']
 
 
 files = glob('../rob599_dataset_deploy/test/*/*_image.jpg')
 files.sort()
-classify_image.create_graph()
+
+graph = label_image.load_graph('./retrained_graph.pb')
+labels = label_image.load_labels('./retrained_labels.txt')
+
 fig1 = plt.figure(1, figsize=(16, 9))
 fig3 = plt.figure(3, figsize=(10,10))
 
@@ -52,6 +46,7 @@ for i in range(len(files)):
     
 
     xyz = utils.get_lidar(imgpath)
+    xyz = parse_lidar.densify_lidar(xyz)
     proj = utils.get_camera_projection(imgpath)
 
     imgs_of_interest = parse_lidar.get_potential_car_images(img, xyz, np.array(proj))
@@ -65,7 +60,8 @@ for i in range(len(files)):
     for i in range(num_fig):
         tmp_imgpath = '/tmp/img.jpg'
         imageio.imwrite(tmp_imgpath, imgs_of_interest[i])
-        label = classify_image.run_inference_on_image_path(tmp_imgpath)
+
+        label = labels[label_image.classify_image(graph, tmp_imgpath)]
 
         for word in CAR_WORDS:
             if label.find(word) >= 0:

@@ -30,7 +30,7 @@ classes = ['Unknown', 'Compacts', 'Sedans', 'SUVs', 'Coupes',
 # files = glob('deploy/*/*/*_image.jpg')
 files = glob('../rob599_dataset_deploy/trainval/*/*_image.jpg')
 # files = glob('../rob599_dataset_deploy/test/0815cc1e-9a0c-4875-a5ca-784ef1a32bba/0008_image.jpg')
-files = glob('../rob599_dataset_deploy/trainval/94835623-ca6c-4ac4-82d4-0e63c1b7c16a/0079_image.jpg')
+# files = glob('../rob599_dataset_deploy/trainval/94835623-ca6c-4ac4-82d4-0e63c1b7c16a/0079_image.jpg')
 
 
 num_cars = {}
