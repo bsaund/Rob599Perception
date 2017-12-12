@@ -16,6 +16,9 @@ import IPython
 def densify_lidar(xyz, densify_dist=30):
     """
     Returns new lidar points, with additional points filling in far away gaps
+
+    Useful because later we will cluster by distance, but in the raw lidar data
+    points that are far away from the sensor will necessarily be far from any other measurements
     """
     new_xyz = []
     for i in range(xyz.shape[0]-1):
@@ -41,12 +44,14 @@ def mask_far_points(lidar):
     """Mask out points above the threshold"""
     return np.linalg.norm(lidar, axis=1) < 60
 
-def mask_out_horizontal(xyz):
+def mask_out_horizontal(xyz, radius=0.4, slope=0.2):
+    """
+    Mask out points where all neighbors within a radius are 
+    sufficiently flat in the y direction
+    """
     kdtree = KDTree(xyz)
     too_horizontal = [False]*xyz.shape[0]
-    radius = 0.4
-    slope_tol = .2
-    vert_tol = slope_tol*radius
+    vert_tol = slope*radius
     for i in range(xyz.shape[0]):
         p = xyz[i,:]
         y = p[1]
@@ -122,16 +127,9 @@ def get_points_of_interest(raw_lidar):
     """
     inlier_mask = lidar_mask(raw_lidar)
     inliers = raw_lidar[inlier_mask,:]
-    # centers = kmeans_cluster(inliers)
-    # pois = get_points_around_cluster(centers, inliers)
-    # clusters_ind = car_clusters(point_cloud
-
-    # for inds in clusters_ind:
-    #     IPython.embed()
     pois = car_clusters(inliers)
-    # IPython.embed()
-    return pois
 
+    return pois
 
 
 def extract_image(image, corners):
@@ -202,12 +200,24 @@ def get_potential_car_images(image, raw_lidar, proj):
     imgs, pois = get_imgs_and_clusters(image, raw_lidar, proj)
     return imgs
 
+
 def get_imgs_and_clusters(image, raw_lidar, proj):
     """
-    Wraps all the other functions here...
-    Given an image, lidar data, and a projection matrix, returns a list of images of 
-      where the lidar is interesting. Some will be cars, some will not be cars.
-    It is intended that all cars are somewhere in the images returned
+    Uses the other functions here.
+    Given an image, lidar data, and a projection matrix, returns a list of croppings of
+    the whole image where the lidar is interesting. 
+
+    The cropped images of interest is (hopefully) a superset of the cropping of each car
+    Some images returned will not be cars.
+
+    Parameters:
+    images (np.array):  full image
+    raw_lidar (np.array): unalered lidar data from sensor
+    proj (np.array): projection matrix from lidar data to image
+
+    Returns:
+    imgs ( [np.array] ): list of cropped images of interest.
+    pois ( [np.array] ): list of point clouds corresponding to each cropped image
     """
     pois = get_points_of_interest(raw_lidar)
     corners = []

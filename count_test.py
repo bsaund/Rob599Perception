@@ -50,7 +50,11 @@ for i in range(len(files)):
     proj = utils.get_camera_projection(imgpath)
 
 
+    #==============================================================================
+    #   Analyze lidar data, pulling out images of point clusters that might be cars
+    #==============================================================================
     imgs_of_interest, clusters = parse_lidar.get_imgs_and_clusters(img, xyz, np.array(proj))
+    
     for cluster in clusters:
         utils.plot_img_lidar(ax1, cluster, proj)
 
@@ -61,6 +65,9 @@ for i in range(len(files)):
         tmp_imgpath = '/tmp/img.jpg'
         imageio.imwrite(tmp_imgpath, imgs_of_interest[i])
 
+        #=========================================================
+        #    Classify image using tensorflow
+        #=========================================================
         label = labels[label_image.classify_image(graph, tmp_imgpath)]
 
         for word in CAR_WORDS:
@@ -71,7 +78,7 @@ for i in range(len(files)):
 
         ax = fig3.add_subplot(np.ceil(np.sqrt(num_fig)), np.ceil(np.sqrt(num_fig)), i+1)
         ax.imshow(imgs_of_interest[i])
-        # label = classifier.classify(imgs_of_interest[i])
+
         
         for word in CAR_WORDS:
             if label.find(word) >= 0:
