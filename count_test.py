@@ -49,10 +49,10 @@ for i in range(len(files)):
     xyz = parse_lidar.densify_lidar(xyz)
     proj = utils.get_camera_projection(imgpath)
 
-    imgs_of_interest = parse_lidar.get_potential_car_images(img, xyz, np.array(proj))
-    # clusters = parse_lidar.get_points_of_interest(xyz)
-    # inliers = parse_lidar.lidar_mask(xyz)
-    # line_mask = parse_lidar.mask_out_long_smooth_lines(xyz)
+
+    imgs_of_interest, clusters = parse_lidar.get_imgs_and_clusters(img, xyz, np.array(proj))
+    for cluster in clusters:
+        utils.plot_img_lidar(ax1, cluster, proj)
 
     car_count = 0
     num_fig = len(imgs_of_interest)

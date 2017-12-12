@@ -30,165 +30,12 @@ def densify_lidar(xyz, densify_dist=30):
     return np.array(new_xyz)
 
 
-class PlaneModel:
-    """
-    Base model for a plane used in RANSAC 
-    """
-    def __init__(self, P=None):
-        self.P = P
-        
-    def fit(self, X, y):
-        self.P = X
-
-    def predict(self, X):
-
-        # print("predicting")
-        P = self.P
-
-        n = np.cross(P[1,:] - P[0,:], P[2,:] - P[1,:])
-        n = n/np.linalg.norm(n)
-        d = np.matmul((X-P[1,:]),n)
-        return np.array(d)
-
-    def score(self, X, y):
-        return np.sum(np.abs(y))
-
-    def get_params(self, deep=True):
-        return {'P': self.P}
-
-    def set_params(self, P=None, random_state=None):
-        if P is not None:
-            self.P = P
 
 def diag_len(cluster):
     """
     Returns the diagonal length of the axis-aligned bounding box of a cluster of points
     """
     return np.linalg.norm(np.max(cluster, axis=0) - np.min(cluster,axis=0))
-
-def mask_out_long_lines(xyz):
-    """
-    Returns a mask that removes long straight lines from the lidar data
-    xyz[mask] = lidar points that are not road, building, etc...
-
-    NOT USED: THIS APPROACH WAS TOO EXPENSIVE
-    """
-    print('starting line filtering')
-    line_mask = [False]*xyz.shape[0]
-    inds_in_a_line = []
-    d_max_acceptable = 0.1
-    for point_ind in range(xyz.shape[0]):
-        point = xyz[point_ind,:]
-        if len(inds_in_a_line) <= 2:
-            inds_in_a_line.append(point_ind)
-            continue
-        d_max = 0
-        p1 = xyz[inds_in_a_line[0],:]
-        pe = xyz[inds_in_a_line[-1],:]
-        print(len(inds_in_a_line))
-        for i in range(1, len(inds_in_a_line)-1):
-            d_max = max(d_max, norm(np.cross(pe-p1, p1-xyz[inds_in_a_line[i],:]))/norm(pe-p1))
-        if d_max > d_max_acceptable:
-            if len(inds_in_a_line) > 2 and norm(pe-p1) > 5:
-                for ind in inds_in_a_line:
-                    line_mask[ind] = True
-            inds_in_a_line = []
-            continue
-        inds_in_a_line.append(point_ind)
-    print('ending line filtering')
-    return np.logical_not(line_mask)
-
-def mask_out_long_smooth_lines(xyz):
-    """
-    Returns a mask that removes long sequences of lidar data that (locally) dont change much
-    xyz[mask] = lidar points that are not road, building, etc...
-
-    This iterates through all lidar data, finding the large 'jumps' is position.
-    If a sufficiently long section has no jumps, then it cannot be a car.
-    """
-    
-    line_mask = [False]*xyz.shape[0]
-    inds_in_a_line = []
-    costheta_min_acceptable = np.cos(10*np.pi/180)
-    
-    d_max_acceptable = .3
-    for point_ind in range(xyz.shape[0]):
-        if len(inds_in_a_line) <= 2:
-            inds_in_a_line.append(point_ind)
-            continue
-        point = xyz[point_ind,:]
-        ps = xyz[inds_in_a_line[-2],:]
-        pf = xyz[inds_in_a_line[-1],:]
-        pnew = xyz[point_ind,:]
-        d = norm(pnew - pf)
-        
-        costheta = np.dot(pnew - ps, pf - ps)/(norm(pnew-ps)*norm(pf-ps))
-        # if (d > d_max_acceptable) or (costheta < costheta_min_acceptable):
-        if (d > d_max_acceptable):
-            p0 = xyz[inds_in_a_line[0],:]
-            if len(inds_in_a_line) > 3 and norm(p0-pf) > 7:
-                for ind in inds_in_a_line:
-                    line_mask[ind] = True
-            inds_in_a_line = []
-            continue
-        inds_in_a_line.append(point_ind)
-    return np.logical_not(line_mask)
-
-
-def mask_largest_plane(xyz):
-    """
-    Returns a np.array of {True,False} with size of xyz.shape[0]
-    This is a mask, where True are points near the largest plane
-
-    The largest plane is probably the road, so remove those lidar points
-    """
-    ransac = linear_model.RANSACRegressor(PlaneModel(),
-                                          max_trials=100,
-                                          residual_threshold=.2)
-
-    dummy = np.zeros(xyz.shape[0])
-
-    ransac.fit(xyz, dummy)
-    return ransac.inlier_mask_
-
-
-def mask_out_large_planes_complicated(xyz):
-    """
-    Returns a np.array of {True,False} with size of lidar.shape[0]
-    This is a mask for all sufficiently large planes in the image
-    
-    Keeps removing largest plane until no large planes exist
-    TOO EXPENSIVE< NOT USEFUL ENOUGH
-    NOT USED
-    """
-    not_plane = np.array([True] * xyz.shape[0])
-    
-    new_plane_ind = mask_largest_plane(xyz)
-
-    def large_enough_connected_plane(plane_points, req_num, req_diag):
-        s = euclid_segmentation(plane_points, 0.1, req_num)
-        # IPython.embed()
-        if len(s) == 0:
-            return False
-        max_region = list(max(s, key = len))
-        return diag_len(plane_points[max_region,:]) > req_diag
-
-    count = 0
-    # while np.sum(new_plane_ind)>1000 and diag_len(xyz[not_plane,:][new_plane_ind,:]) > 10:
-    while large_enough_connected_plane(xyz[not_plane,:][new_plane_ind,:], 500, 5):
-        count += 1
-        not_plane[np.where(not_plane==True)] = np.logical_not(new_plane_ind)
-        new_plane_ind = mask_largest_plane(xyz[not_plane,:])
-
-        
-
-    print("Found ", count, "Planes")
-    return not_plane
-    # return np.logical_not(mask_largest_plane(xyz))
-
-def mask_out_large_planes(xyz):
-    """ Masks only the largest plane"""
-    return np.logical_not(mask_largest_plane(xyz))
 
 def mask_far_points(lidar):
     """Mask out points above the threshold"""
@@ -218,7 +65,7 @@ def lidar_mask(lidar):
 
     # not_ground = mask_out_large_planes(lidar)
     near = mask_far_points(lidar)
-    not_long = mask_out_long_smooth_lines(lidar)
+    # not_long = mask_out_long_smooth_lines(lidar)
     not_hor = mask_out_horizontal(lidar)
 
     # return np.logical_and(not_ground, near, not_long)
@@ -375,10 +222,190 @@ def get_imgs_and_clusters(image, raw_lidar, proj):
     imgs, mask = extract_images(image, corners)
     return imgs, np.array(pois)[mask]
     
+
+
+
+
+
+#####################################################
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#
+#                                                   #
+#                  UNUSED                           #
+#                                                   #
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#
+#####################################################
+
+#The following funtions were tried, but ultimately
+# were not useful
+
+
+
+#######################################################
+#  RANAC plane removal
+#######################################################
+
+class PlaneModel:
+    """
+    Base model for a plane used in RANSAC 
+    """
+    def __init__(self, P=None):
+        self.P = P
+        
+    def fit(self, X, y):
+        self.P = X
+
+    def predict(self, X):
+
+        # print("predicting")
+        P = self.P
+
+        n = np.cross(P[1,:] - P[0,:], P[2,:] - P[1,:])
+        n = n/np.linalg.norm(n)
+        d = np.matmul((X-P[1,:]),n)
+        return np.array(d)
+
+    def score(self, X, y):
+        return np.sum(np.abs(y))
+
+    def get_params(self, deep=True):
+        return {'P': self.P}
+
+    def set_params(self, P=None, random_state=None):
+        if P is not None:
+            self.P = P
+
+
+
+def mask_largest_plane(xyz):
+    """
+    Returns a np.array of {True,False} with size of xyz.shape[0]
+    This is a mask, where True are points near the largest plane
+
+    The largest plane is probably the road, so remove those lidar points
+    """
+    ransac = linear_model.RANSACRegressor(PlaneModel(),
+                                          max_trials=100,
+                                          residual_threshold=.2)
+
+    dummy = np.zeros(xyz.shape[0])
+
+    ransac.fit(xyz, dummy)
+    return ransac.inlier_mask_
+
+
+def mask_out_large_planes_complicated(xyz):
+    """
+    Returns a np.array of {True,False} with size of lidar.shape[0]
+    This is a mask for all sufficiently large planes in the image
     
+    Keeps removing largest plane until no large planes exist
+    TOO EXPENSIVE< NOT USEFUL ENOUGH
+    NOT USED
+    """
+    not_plane = np.array([True] * xyz.shape[0])
     
+    new_plane_ind = mask_largest_plane(xyz)
+
+    def large_enough_connected_plane(plane_points, req_num, req_diag):
+        s = euclid_segmentation(plane_points, 0.1, req_num)
+        # IPython.embed()
+        if len(s) == 0:
+            return False
+        max_region = list(max(s, key = len))
+        return diag_len(plane_points[max_region,:]) > req_diag
+
+    count = 0
+    # while np.sum(new_plane_ind)>1000 and diag_len(xyz[not_plane,:][new_plane_ind,:]) > 10:
+    while large_enough_connected_plane(xyz[not_plane,:][new_plane_ind,:], 500, 5):
+        count += 1
+        not_plane[np.where(not_plane==True)] = np.logical_not(new_plane_ind)
+        new_plane_ind = mask_largest_plane(xyz[not_plane,:])
+
+        
+
+    print("Found ", count, "Planes")
+    return not_plane
+    # return np.logical_not(mask_largest_plane(xyz))
+
+def mask_out_large_planes(xyz):
+    """ Masks only the largest plane"""
+    return np.logical_not(mask_largest_plane(xyz))
+
+def mask_out_long_lines(xyz):
+    """
+    Returns a mask that removes long straight lines from the lidar data
+    xyz[mask] = lidar points that are not road, building, etc...
+
+    NOT USED: THIS APPROACH WAS TOO EXPENSIVE
+    """
+    print('starting line filtering')
+    line_mask = [False]*xyz.shape[0]
+    inds_in_a_line = []
+    d_max_acceptable = 0.1
+    for point_ind in range(xyz.shape[0]):
+        point = xyz[point_ind,:]
+        if len(inds_in_a_line) <= 2:
+            inds_in_a_line.append(point_ind)
+            continue
+        d_max = 0
+        p1 = xyz[inds_in_a_line[0],:]
+        pe = xyz[inds_in_a_line[-1],:]
+        print(len(inds_in_a_line))
+        for i in range(1, len(inds_in_a_line)-1):
+            d_max = max(d_max, norm(np.cross(pe-p1, p1-xyz[inds_in_a_line[i],:]))/norm(pe-p1))
+        if d_max > d_max_acceptable:
+            if len(inds_in_a_line) > 2 and norm(pe-p1) > 5:
+                for ind in inds_in_a_line:
+                    line_mask[ind] = True
+            inds_in_a_line = []
+            continue
+        inds_in_a_line.append(point_ind)
+    print('ending line filtering')
+    return np.logical_not(line_mask)
+
+def mask_out_long_smooth_lines(xyz):
+    """
+    Returns a mask that removes long sequences of lidar data that (locally) dont change much
+    xyz[mask] = lidar points that are not road, building, etc...
+
+    This iterates through all lidar data, finding the large 'jumps' is position.
+    If a sufficiently long section has no jumps, then it cannot be a car.
+    """
+    
+    line_mask = [False]*xyz.shape[0]
+    inds_in_a_line = []
+    costheta_min_acceptable = np.cos(10*np.pi/180)
+    
+    d_max_acceptable = .3
+    for point_ind in range(xyz.shape[0]):
+        if len(inds_in_a_line) <= 2:
+            inds_in_a_line.append(point_ind)
+            continue
+        point = xyz[point_ind,:]
+        ps = xyz[inds_in_a_line[-2],:]
+        pf = xyz[inds_in_a_line[-1],:]
+        pnew = xyz[point_ind,:]
+        d = norm(pnew - pf)
+        
+        costheta = np.dot(pnew - ps, pf - ps)/(norm(pnew-ps)*norm(pf-ps))
+        # if (d > d_max_acceptable) or (costheta < costheta_min_acceptable):
+        if (d > d_max_acceptable):
+            p0 = xyz[inds_in_a_line[0],:]
+            if len(inds_in_a_line) > 3 and norm(p0-pf) > 7:
+                for ind in inds_in_a_line:
+                    line_mask[ind] = True
+            inds_in_a_line = []
+            continue
+        inds_in_a_line.append(point_ind)
+    return np.logical_not(line_mask)
+
+
+
 
 if __name__ == "__main__":
     img = utils.getRandomImagePath()
     xyz = utils.getLidar(img)
     mask_large_planes(xyz)
+
+
+
