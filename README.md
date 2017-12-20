@@ -1,14 +1,16 @@
 # Perception
 
-## Setup on linux
+## Setup on linux (tested on Ubuntu 16.04)
+Install python3 and tensorflow (preferably in a virtualenv)
+
     cd ~
     virtualenv -p python3 tf3
     source ~/tf3/bin/activate
     sudo apt install python3-tk
-    pip install tensorflow matplotlib pillow scikit-learn imageio networkx
+    pip install tensorflow matplotlib pillow scikit-learn imageio networkx IPython scipy
 
 
-Download the training data and place in a folder at the same level as the Perception folder (not in this git repo - that would be too large)
+Download the [training data](http://umich.edu/~fcav/rob599_dataset_deploy.zip) and place in a folder at the same level as the Perception folder (not in this git repo - that would be too large)
 Run `python ./count_test` to start computing labels for the test data. This will write to outfile.txt.
 To view this file in real time: `tail -f outfile.txt`
 
