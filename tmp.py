@@ -93,7 +93,7 @@ ax2.set_xlabel('x')
 ax2.set_ylabel('y')
 ax2.set_zlabel('z')
 
-classify_image.create_graph()
+# classify_image.create_graph()
 graph = label_image.load_graph('./retrained_graph.pb')
 labels = label_image.load_labels('./retrained_labels.txt')
 
